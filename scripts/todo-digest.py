@@ -14,15 +14,47 @@ import sys
 from datetime import datetime, timezone, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from zoneinfo import ZoneInfo
 
-BJT = timezone(timedelta(hours=8))
 DB_PATH = os.path.expanduser("~/.openclaw/workspace/todo.db")
 ENV_FILE = os.path.expanduser("~/.stock-monitor.env")
 LOG_FILE = os.path.expanduser("~/logs/todo-digest.log")
 
+# Timezone: reads TODO_TZ from env var or ~/.stock-monitor.env
+# Switch when traveling: TODO_TZ=America/Vancouver
+_TZ_LABELS = {
+    "Asia/Shanghai": "BJT",
+    "America/Vancouver": "PDT",
+    "America/Toronto": "EDT",
+    "America/New_York": "EDT",
+    "Europe/London": "BST",
+    "Asia/Tokyo": "JST",
+    "Asia/Hong_Kong": "HKT",
+}
+
+
+def _resolve_tz() -> tuple[ZoneInfo, str]:
+    """Read TODO_TZ from env var or .stock-monitor.env, default Asia/Shanghai."""
+    tz_name = os.environ.get("TODO_TZ", "")
+    if not tz_name:
+        try:
+            with open(ENV_FILE) as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("TODO_TZ="):
+                        tz_name = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        break
+        except IOError:
+            pass
+    tz_name = tz_name or "Asia/Shanghai"
+    return ZoneInfo(tz_name), _TZ_LABELS.get(tz_name, tz_name)
+
+
+LOCAL_TZ, LOCAL_TZ_LABEL = _resolve_tz()
+
 
 def log(msg: str) -> None:
-    ts = datetime.now(BJT).strftime("%Y-%m-%d %H:%M:%S BJT")
+    ts = datetime.now(LOCAL_TZ).strftime(f"%Y-%m-%d %H:%M:%S {LOCAL_TZ_LABEL}")
     line = f"[{ts}] {msg}"
     print(line, flush=True)
 
@@ -130,12 +162,12 @@ def format_age_detailed(created_at: str) -> tuple[str, int]:
     return (age, days)
 
 
-def created_bjt_str(created_at: str) -> str:
-    """Convert UTC timestamp to BJT display string like 'Mar 01, 14:30'."""
+def created_local_str(created_at: str) -> str:
+    """Convert UTC timestamp to local TZ display string like 'Mar 01, 14:30'."""
     created = parse_created(created_at)
     if not created:
         return ""
-    return created.astimezone(BJT).strftime("%b %d, %H:%M")
+    return created.astimezone(LOCAL_TZ).strftime("%b %d, %H:%M")
 
 
 def health_emoji(status: str, age_days: int) -> str:
@@ -183,9 +215,9 @@ def health_emoji(status: str, age_days: int) -> str:
 
 def build_html(data: dict) -> str:
     """Generate professional table-based HTML email from task data."""
-    now_bjt = datetime.now(BJT)
-    date_str = now_bjt.strftime("%A, %B %d")
-    time_str = now_bjt.strftime("%H:%M BJT")
+    now_local = datetime.now(LOCAL_TZ)
+    date_str = now_local.strftime("%A, %B %d")
+    time_str = now_local.strftime(f"%H:%M {LOCAL_TZ_LABEL}")
     stats = data["stats"]
     in_progress = stats.get("in_progress", 0)
     pending = stats.get("pending", 0)
@@ -214,7 +246,7 @@ def build_html(data: dict) -> str:
         text = html.escape(task["text"])
         age_str, age_days = format_age_detailed(task["created_at"])
         emoji = health_emoji(task["status"], age_days)
-        created_ts = created_bjt_str(task["created_at"])
+        created_ts = created_local_str(task["created_at"])
         is_done = task["status"] in ("done", "skipped")
         text_decoration = "text-decoration:line-through;" if is_done else ""
         border = "" if is_last else "border-bottom:1px solid #eef0f4;"
@@ -234,7 +266,7 @@ def build_html(data: dict) -> str:
                 r_utc = datetime.strptime(
                     task["reminder_at"], "%Y-%m-%dT%H:%M:%S.%fZ"
                 ).replace(tzinfo=timezone.utc)
-                r_bjt = r_utc.astimezone(BJT).strftime("%m/%d %H:%M")
+                r_bjt = r_utc.astimezone(LOCAL_TZ).strftime("%m/%d %H:%M")
                 reminder_html = (
                     f'&nbsp;&nbsp;<span style="font-size:11px;color:#d97706;'
                     f'font-family:Trebuchet MS,Verdana,sans-serif">'
@@ -485,8 +517,8 @@ def main() -> None:
         log("No active tasks and no recent completions — skipping email")
         return
 
-    now_bjt = datetime.now(BJT).strftime("%b %d %H:%M BJT")
-    subject = f"\U0001f4cb Todo Digest - {now_bjt}"
+    now_local = datetime.now(LOCAL_TZ).strftime(f"%b %d %H:%M {LOCAL_TZ_LABEL}")
+    subject = f"\U0001f4cb Todo Digest - {now_local}"
 
     html_body = build_html(data)
     env = load_env()
