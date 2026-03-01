@@ -232,54 +232,54 @@ def build_html(data: dict) -> str:
         g = task["group_name"]
         groups.setdefault(g, []).append(task)
 
-    # Status config: (dot_color, label, text_color)
+    # Status config: (accent_color, label, text_color)
     status_cfg = {
-        "in_progress": ("#0066cc", "IN PROGRESS", "#1a1a2e"),
-        "pending": ("#94a3b8", "PENDING", "#1a1a2e"),
-        "done": ("#22863a", "DONE", "#8b949e"),
-        "skipped": ("#cf6820", "SKIPPED", "#8b949e"),
+        "in_progress": ("#0969da", "IN PROGRESS", "#24292f"),
+        "pending": ("#656d76", "PENDING", "#24292f"),
+        "done": ("#1a7f37", "DONE", "#656d76"),
+        "skipped": ("#bc4c00", "SKIPPED", "#656d76"),
     }
 
     def render_task_row(task: dict, is_last: bool = False) -> str:
         cfg = status_cfg.get(task["status"], ("#999", "?", "#333"))
-        dot_color, status_label, text_color = cfg
+        accent, status_label, text_color = cfg
         text = html.escape(task["text"])
         age_str, age_days = format_age_detailed(task["created_at"])
         emoji = health_emoji(task["status"], age_days)
         created_ts = created_local_str(task["created_at"])
         is_done = task["status"] in ("done", "skipped")
         text_decoration = "text-decoration:line-through;" if is_done else ""
-        border = "" if is_last else "border-bottom:1px solid #eef0f4;"
+        border = "" if is_last else "border-bottom:1px solid #d8dee4;"
 
-        # Age color: escalates from gray → amber → red as task lingers
+        # Age color: escalates as task lingers
         if age_days > 7:
-            age_color = "#dc2626"    # red — overdue
+            age_color = "#cf222e"
         elif age_days > 3:
-            age_color = "#d97706"    # amber — getting stale
+            age_color = "#bc4c00"
         else:
-            age_color = "#94a3b8"    # gray — healthy
+            age_color = "#656d76"
 
-        # Reminder line
+        # Reminder
         reminder_html = ""
         if task.get("reminder_at"):
             try:
                 r_utc = datetime.strptime(
                     task["reminder_at"], "%Y-%m-%dT%H:%M:%S.%fZ"
                 ).replace(tzinfo=timezone.utc)
-                r_bjt = r_utc.astimezone(LOCAL_TZ).strftime("%m/%d %H:%M")
+                r_local = r_utc.astimezone(LOCAL_TZ).strftime("%m/%d %H:%M")
                 reminder_html = (
-                    f'&nbsp;&nbsp;<span style="font-size:11px;color:#d97706;'
+                    f'&nbsp;&nbsp;<span style="font-size:11px;color:#bc4c00;'
                     f'font-family:Trebuchet MS,Verdana,sans-serif">'
-                    f'&#9200; {r_bjt}</span>'
+                    f'&#9200; {r_local}</span>'
                 )
             except Exception:
                 pass
 
-        # Meta line: created timestamp + age + reminder
+        # Meta line
         meta_line = (
-            f'<div style="margin-top:3px;font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;color:#94a3b8;line-height:1.4">'
+            f'<div style="margin-top:4px;font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;color:#656d76;line-height:1.4">'
             f'Created {created_ts}'
-            f' &middot; <span style="color:{age_color}">{age_str}</span>'
+            f' &middot; <span style="color:{age_color};font-weight:600">{age_str}</span>'
             f'{reminder_html}'
             f'</div>'
         )
@@ -289,7 +289,7 @@ def build_html(data: dict) -> str:
     <span style="font-size:18px;line-height:1">{emoji}</span>
   </td>
   <td style="padding:14px 8px;{border}vertical-align:top;width:90px">
-    <span style="font-size:10px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:0.6px;color:{dot_color};font-weight:700">{status_label}</span>
+    <span style="font-size:10px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:0.6px;color:{accent};font-weight:700">{status_label}</span>
   </td>
   <td style="padding:14px 16px 14px 0;{border}vertical-align:top;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:{text_color};line-height:1.5;{text_decoration}">
     {text}
@@ -306,15 +306,15 @@ def build_html(data: dict) -> str:
 
         groups_html += f"""
 <!-- Group: {html.escape(group_name)} -->
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px">
   <tr>
-    <td style="padding:0 0 10px 16px">
-      <span style="font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:1.5px;color:#64748b;font-weight:700;text-transform:uppercase">{html.escape(group_name)}</span>
+    <td style="padding:0 0 8px 4px">
+      <span style="font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:1.5px;color:#24292f;font-weight:700;text-transform:uppercase">{html.escape(group_name)}</span>
     </td>
   </tr>
   <tr>
     <td>
-      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border:1px solid #e2e6ed;border-radius:6px">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border:1px solid #d0d7de;border-radius:6px">
         {rows}
       </table>
     </td>
@@ -331,13 +331,13 @@ def build_html(data: dict) -> str:
         recent_html = f"""
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px">
   <tr>
-    <td style="padding:16px 0 10px 16px;border-top:2px solid #eef0f4">
-      <span style="font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:1.5px;color:#94a3b8;font-weight:700;text-transform:uppercase">Completed &middot; Last 24h</span>
+    <td style="padding:16px 0 8px 4px;border-top:1px solid #d0d7de">
+      <span style="font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:1.5px;color:#656d76;font-weight:700;text-transform:uppercase">Completed &middot; Last 24h</span>
     </td>
   </tr>
   <tr>
     <td>
-      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fafbfc;border:1px solid #e2e6ed;border-radius:6px">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f6f8fa;border:1px solid #d0d7de;border-radius:6px">
         {recent_rows}
       </table>
     </td>
@@ -351,43 +351,48 @@ def build_html(data: dict) -> str:
 <table width="100%" cellpadding="0" cellspacing="0" border="0">
   <tr>
     <td style="padding:48px 24px;text-align:center">
-      <p style="font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#94a3b8;font-style:italic;margin:0">Nothing on the board. Enjoy the calm.</p>
+      <p style="font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#656d76;font-style:italic;margin:0">Nothing on the board. Enjoy the calm.</p>
     </td>
   </tr>
 </table>"""
+
+    # Progress percentage
+    pct = int(done_total / max(done_total + total_active, 1) * 100)
 
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
   <title>Task Brief</title>
 </head>
-<body style="margin:0;padding:0;background:#f0f2f5;-webkit-text-size-adjust:100%">
+<body style="margin:0;padding:0;background:#ffffff;-webkit-text-size-adjust:100%">
 
-<!-- Outer wrapper table for centering -->
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f0f2f5">
+<!-- Outer wrapper -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff">
   <tr>
-    <td align="center" style="padding:24px 16px">
+    <td align="center" style="padding:20px 16px">
 
       <!-- Main container -->
       <table width="580" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%">
 
         <!-- Header -->
         <tr>
-          <td style="background:#1a1f36;padding:28px 32px 24px;border-radius:8px 8px 0 0">
+          <td style="padding:24px 28px 20px;border-bottom:2px solid #24292f">
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td>
-                  <span style="font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:3px;color:#7c85a6;text-transform:uppercase;font-weight:700">Task Brief</span>
+                  <span style="font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:3px;color:#0969da;text-transform:uppercase;font-weight:700">Task Brief</span>
                 </td>
                 <td align="right">
-                  <span style="font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:0.5px;color:#7c85a6">{time_str}</span>
+                  <span style="font-size:12px;font-family:Trebuchet MS,Verdana,sans-serif;color:#656d76">{time_str}</span>
                 </td>
               </tr>
               <tr>
-                <td colspan="2" style="padding-top:8px">
-                  <span style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#e8eaf0;font-weight:400">{date_str}</span>
+                <td colspan="2" style="padding-top:6px">
+                  <span style="font-family:Georgia,'Times New Roman',serif;font-size:24px;color:#24292f;font-weight:400">{date_str}</span>
                 </td>
               </tr>
             </table>
@@ -396,23 +401,23 @@ def build_html(data: dict) -> str:
 
         <!-- Metrics row -->
         <tr>
-          <td style="background:#252b48;padding:0 0 2px">
+          <td style="padding:20px 28px;border-bottom:1px solid #d0d7de">
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td width="33%" align="center" style="padding:18px 8px;border-right:1px solid #333a58">
-                  <span style="font-family:Georgia,'Times New Roman',serif;font-size:28px;color:#6db3f2;font-weight:400;line-height:1">{in_progress}</span>
+                <td width="33%" align="center" style="padding:12px 4px;background:#f6f8fa;border:1px solid #d0d7de;border-radius:6px 0 0 6px;border-right:none">
+                  <span style="font-family:Georgia,'Times New Roman',serif;font-size:30px;color:#0969da;font-weight:400;line-height:1">{in_progress}</span>
                   <br>
-                  <span style="font-size:10px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:1px;color:#7c85a6;text-transform:uppercase">Active</span>
+                  <span style="font-size:10px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:1px;color:#656d76;text-transform:uppercase;font-weight:600">Active</span>
                 </td>
-                <td width="34%" align="center" style="padding:18px 8px;border-right:1px solid #333a58">
-                  <span style="font-family:Georgia,'Times New Roman',serif;font-size:28px;color:#94a3b8;font-weight:400;line-height:1">{pending}</span>
+                <td width="34%" align="center" style="padding:12px 4px;background:#f6f8fa;border:1px solid #d0d7de;border-radius:0;border-right:none">
+                  <span style="font-family:Georgia,'Times New Roman',serif;font-size:30px;color:#24292f;font-weight:400;line-height:1">{pending}</span>
                   <br>
-                  <span style="font-size:10px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:1px;color:#7c85a6;text-transform:uppercase">Queued</span>
+                  <span style="font-size:10px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:1px;color:#656d76;text-transform:uppercase;font-weight:600">Queued</span>
                 </td>
-                <td width="33%" align="center" style="padding:18px 8px">
-                  <span style="font-family:Georgia,'Times New Roman',serif;font-size:28px;color:#56d4a0;font-weight:400;line-height:1">{done_today}</span>
+                <td width="33%" align="center" style="padding:12px 4px;background:#f6f8fa;border:1px solid #d0d7de;border-radius:0 6px 6px 0">
+                  <span style="font-family:Georgia,'Times New Roman',serif;font-size:30px;color:#1a7f37;font-weight:400;line-height:1">{done_today}</span>
                   <br>
-                  <span style="font-size:10px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:1px;color:#7c85a6;text-transform:uppercase">Done Today</span>
+                  <span style="font-size:10px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:1px;color:#656d76;text-transform:uppercase;font-weight:600">Done Today</span>
                 </td>
               </tr>
             </table>
@@ -421,25 +426,19 @@ def build_html(data: dict) -> str:
 
         <!-- Progress bar -->
         <tr>
-          <td style="background:#ffffff;padding:0;border-left:1px solid #e2e6ed;border-right:1px solid #e2e6ed">
+          <td style="padding:16px 28px 4px">
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td style="padding:20px 32px 4px">
-                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <td style="font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;color:#656d76;padding-bottom:6px">
+                  Progress &middot; {done_total} of {done_total + total_active} total &middot; {pct}%
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#d0d7de;border-radius:4px;height:6px">
                     <tr>
-                      <td style="font-size:10px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:1px;color:#94a3b8;text-transform:uppercase;padding-bottom:8px">
-                        Progress &middot; {done_total} of {done_total + total_active} total
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eef0f4;border-radius:3px;height:6px">
-                          <tr>
-                            <td style="background:linear-gradient(90deg,#0066cc,#56d4a0);border-radius:3px;height:6px;width:{int(done_total / max(done_total + total_active, 1) * 100)}%"></td>
-                            <td></td>
-                          </tr>
-                        </table>
-                      </td>
+                      <td style="background:#0969da;border-radius:4px;height:6px;width:{pct}%"></td>
+                      <td></td>
                     </tr>
                   </table>
                 </td>
@@ -450,7 +449,7 @@ def build_html(data: dict) -> str:
 
         <!-- Content area -->
         <tr>
-          <td style="background:#ffffff;padding:20px 32px 32px;border-left:1px solid #e2e6ed;border-right:1px solid #e2e6ed;border-radius:0 0 8px 8px;border-bottom:1px solid #e2e6ed">
+          <td style="padding:20px 28px 28px">
 
             {groups_html}
 
@@ -463,20 +462,18 @@ def build_html(data: dict) -> str:
 
         <!-- Footer -->
         <tr>
-          <td style="padding:20px 32px;text-align:center">
-            <span style="font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;color:#94a3b8;letter-spacing:0.3px">
+          <td style="padding:16px 28px;border-top:1px solid #d0d7de;text-align:center">
+            <span style="font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;color:#656d76">
               Delivered every 4 hours &middot; {done_total} done, {skipped_total} skipped all time
             </span>
           </td>
         </tr>
 
       </table>
-      <!-- /Main container -->
 
     </td>
   </tr>
 </table>
-<!-- /Outer wrapper -->
 
 </body>
 </html>"""
