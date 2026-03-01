@@ -118,6 +118,14 @@ This is the only case where you may show the list without the user explicitly re
   - Delete entries too (ONLY if user explicitly wants it):
     - `bash {baseDir}/scripts/todo.sh group remove "Work" --delete-entries`
 
+## 7) Email digest
+- A cron job sends a “Task Brief” email every 4 hours with the full task board + stats.
+- The user can also manually trigger it by saying “发一封任务摘要” / “send me a digest” / “send task brief”:
+  - Run: `python3 {baseDir}/scripts/todo-digest.py`
+  - Reply with ONE short confirmation: “已发送。” / “Sent.”
+- The digest reads `todo.db` (read-only) and sends to the configured email.
+- Do NOT modify `todo-digest.py` or its cron schedule — that is managed separately.
+
 ---
 
 # “Clear the list” behavior (no list printing)
