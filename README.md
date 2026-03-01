@@ -8,6 +8,10 @@ A **per-workspace** todo manager for OpenClaw that stores everything in a local 
 - **Task statuses**: `pending`, `in_progress`, `done`, `skipped`
 - **Time-based reminders** — relative (`--in=5m`) or absolute (`--at="20:00"`, Beijing time)
 - **Email digest** — professional "Task Brief" email every 4 hours with metrics, progress bar, and grouped task tables
+- **Health emojis** — visual task health at a glance (🔥⚡⚠️🚨 for active, 💤📋⏳🔴 for pending)
+- **Detailed timestamps** — creation time + lingering duration with color-coded age (gray/amber/red)
+- **Configurable timezone** — `TODO_TZ=Asia/Shanghai` (default), switch to `America/Vancouver` when traveling
+- **Light theme** — white background, high contrast, iPhone dark mode compatible
 - **Smart skip** — no email when the task board is empty
 - **Manual trigger** — say "发一封任务摘要" or "send me a digest" via WhatsApp
 - **Concise agent replies** — no auto-pasting the full list; short confirmations only
@@ -122,19 +126,44 @@ A professional HTML email sent every 4 hours via cron:
 
 | Feature | Detail |
 |---------|--------|
-| **Schedule** | Every 4h (BJT 00, 04, 08, 12, 16, 20) |
-| **Header** | Dark slate masthead with date and time |
+| **Schedule** | Every 4h (UTC 0,4,8,12,16,20) |
+| **Header** | Clean white masthead, blue accent, serif date |
 | **Metrics** | Three cards: Active / Queued / Done Today |
-| **Progress bar** | Visual completion ratio |
-| **Task tables** | Grouped by category, status dots, task age |
+| **Progress bar** | Blue bar with percentage |
+| **Task tables** | Grouped by category, health emojis, detailed timestamps |
+| **Health emojis** | Visual age indicators per task (see table below) |
 | **Completed section** | Tasks done/skipped in last 24h |
 | **Smart skip** | No email if board is empty |
 | **Manual trigger** | WhatsApp: "发一封任务摘要" / "send me a digest" |
+| **Theme** | Light mode, iPhone dark mode compatible |
+
+### Health Emoji Guide
+
+| Status | < 1 day | 1-3 days | 3-7 days | > 7 days |
+|--------|---------|----------|----------|----------|
+| **In Progress** | 🔥 Hot | ⚡ On track | ⚠️ Stale | 🚨 Overdue |
+| **Pending** | 💤 Fresh | 📋 Queued | ⏳ Waiting | 🔴 Stale |
+| **Done** | ✅ | | | |
+| **Skipped** | ⏭️ | | | |
+
+### Timezone Configuration
+
+All timestamps default to **Beijing Time (BJT)**. To switch when traveling:
+
+```bash
+# Add to ~/.stock-monitor.env
+TODO_TZ=America/Vancouver   # PDT/PST
+# TODO_TZ=America/Toronto   # EDT/EST
+# TODO_TZ=Asia/Hong_Kong    # HKT
+# TODO_TZ=Asia/Tokyo        # JST
+```
+
+Supported label shortcuts: BJT, PDT, EDT, BST, JST, HKT. Other IANA timezone names display as-is.
 
 ### Cron Setup
 
 ```bash
-# Add to crontab (UTC times = BJT 08,12,16,20,00,04)
+# Add to crontab (UTC times)
 0 0,4,8,12,16,20 * * * /usr/bin/python3 /path/to/scripts/todo-digest.py >> ~/logs/todo-digest.log 2>&1
 ```
 
@@ -173,6 +202,7 @@ Agent: 已取消。
 todo-management/
 ├── SKILL.md              # OpenClaw skill definition
 ├── README.md             # This file
+├── .gitignore            # Excludes __pycache__, todo.db
 ├── _meta.json            # Skill metadata
 └── scripts/
     ├── todo.sh           # Task CRUD + reminders (Bash/SQLite)
