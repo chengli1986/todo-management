@@ -95,24 +95,90 @@ def query_tasks(db_path: str) -> dict:
     }
 
 
-def format_age(created_at: str) -> str:
-    """Format task age as human-readable string (e.g., '2d', '3h', 'just now')."""
+def parse_created(created_at: str) -> datetime | None:
+    """Parse SQLite CURRENT_TIMESTAMP (UTC) into aware datetime."""
     try:
-        # SQLite CURRENT_TIMESTAMP is UTC
-        created = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S").replace(
+        return datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S").replace(
             tzinfo=timezone.utc
         )
-        delta = datetime.now(timezone.utc) - created
-        days = delta.days
-        hours = delta.seconds // 3600
-        if days > 0:
-            return f"{days}d"
-        elif hours > 0:
-            return f"{hours}h"
-        else:
-            return "just now"
     except Exception:
+        return None
+
+
+def format_age_detailed(created_at: str) -> tuple[str, int]:
+    """Return (human-readable age, total_days) from a UTC timestamp.
+
+    Examples: 'just now', '3 hours', '2 days', '1 week 4 days', '3 weeks'.
+    """
+    created = parse_created(created_at)
+    if not created:
+        return ("", 0)
+    delta = datetime.now(timezone.utc) - created
+    days = delta.days
+    hours = delta.seconds // 3600
+    if days >= 14:
+        weeks = days // 7
+        rem = days % 7
+        age = f"{weeks}w {rem}d" if rem else f"{weeks} weeks"
+    elif days >= 1:
+        age = f"{days} day{'s' if days != 1 else ''}"
+    elif hours >= 1:
+        age = f"{hours} hour{'s' if hours != 1 else ''}"
+    else:
+        minutes = delta.seconds // 60
+        age = f"{minutes}m" if minutes > 0 else "just now"
+    return (age, days)
+
+
+def created_bjt_str(created_at: str) -> str:
+    """Convert UTC timestamp to BJT display string like 'Mar 01, 14:30'."""
+    created = parse_created(created_at)
+    if not created:
         return ""
+    return created.astimezone(BJT).strftime("%b %d, %H:%M")
+
+
+def health_emoji(status: str, age_days: int) -> str:
+    """Return an emoji indicating task health based on status and age.
+
+    In-progress tasks:
+      <1d  🔥 (hot — just started)
+      1-3d ⚡ (on track)
+      3-7d ⚠️ (getting stale)
+      >7d  🚨 (overdue)
+
+    Pending tasks:
+      <1d  💤 (fresh — just added)
+      1-3d 📋 (queued)
+      3-7d ⏳ (waiting too long)
+      >7d  🔴 (stale)
+
+    Done/skipped:
+      ✅ / ⏭️
+    """
+    if status == "done":
+        return "&#x2705;"    # ✅
+    if status == "skipped":
+        return "&#x23ED;&#xFE0F;"  # ⏭️
+
+    if status == "in_progress":
+        if age_days < 1:
+            return "&#x1F525;"   # 🔥
+        elif age_days <= 3:
+            return "&#x26A1;"    # ⚡
+        elif age_days <= 7:
+            return "&#x26A0;&#xFE0F;"  # ⚠️
+        else:
+            return "&#x1F6A8;"   # 🚨
+    else:  # pending
+        if age_days < 1:
+            return "&#x1F4A4;"   # 💤
+        elif age_days <= 3:
+            return "&#x1F4CB;"   # 📋
+        elif age_days <= 7:
+            return "&#x231B;"    # ⏳
+        else:
+            return "&#x1F534;"   # 🔴
 
 
 def build_html(data: dict) -> str:
@@ -146,39 +212,56 @@ def build_html(data: dict) -> str:
         cfg = status_cfg.get(task["status"], ("#999", "?", "#333"))
         dot_color, status_label, text_color = cfg
         text = html.escape(task["text"])
-        age = format_age(task["created_at"])
+        age_str, age_days = format_age_detailed(task["created_at"])
+        emoji = health_emoji(task["status"], age_days)
+        created_ts = created_bjt_str(task["created_at"])
         is_done = task["status"] in ("done", "skipped")
         text_decoration = "text-decoration:line-through;" if is_done else ""
         border = "" if is_last else "border-bottom:1px solid #eef0f4;"
 
-        # Reminder badge
-        reminder_cell = ""
+        # Age color: escalates from gray → amber → red as task lingers
+        if age_days > 7:
+            age_color = "#dc2626"    # red — overdue
+        elif age_days > 3:
+            age_color = "#d97706"    # amber — getting stale
+        else:
+            age_color = "#94a3b8"    # gray — healthy
+
+        # Reminder line
+        reminder_html = ""
         if task.get("reminder_at"):
             try:
                 r_utc = datetime.strptime(
                     task["reminder_at"], "%Y-%m-%dT%H:%M:%S.%fZ"
                 ).replace(tzinfo=timezone.utc)
                 r_bjt = r_utc.astimezone(BJT).strftime("%m/%d %H:%M")
-                reminder_cell = (
-                    f'<br><span style="font-size:11px;color:#d97706;'
+                reminder_html = (
+                    f'&nbsp;&nbsp;<span style="font-size:11px;color:#d97706;'
                     f'font-family:Trebuchet MS,Verdana,sans-serif">'
                     f'&#9200; {r_bjt}</span>'
                 )
             except Exception:
                 pass
 
+        # Meta line: created timestamp + age + reminder
+        meta_line = (
+            f'<div style="margin-top:3px;font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;color:#94a3b8;line-height:1.4">'
+            f'Created {created_ts}'
+            f' &middot; <span style="color:{age_color}">{age_str}</span>'
+            f'{reminder_html}'
+            f'</div>'
+        )
+
         return f"""<tr>
-  <td style="padding:12px 0 12px 16px;{border}vertical-align:top;width:10px">
-    <div style="width:10px;height:10px;border-radius:50%;background:{dot_color};margin-top:4px"></div>
+  <td style="padding:14px 0 14px 16px;{border}vertical-align:top;width:28px;text-align:center">
+    <span style="font-size:18px;line-height:1">{emoji}</span>
   </td>
-  <td style="padding:12px 8px;{border}vertical-align:top">
+  <td style="padding:14px 8px;{border}vertical-align:top;width:90px">
     <span style="font-size:10px;font-family:Trebuchet MS,Verdana,sans-serif;letter-spacing:0.6px;color:{dot_color};font-weight:700">{status_label}</span>
   </td>
-  <td style="padding:12px 16px 12px 0;{border}vertical-align:top;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:{text_color};line-height:1.5;{text_decoration}">
-    {text}{reminder_cell}
-  </td>
-  <td style="padding:12px 16px 12px 0;{border}vertical-align:top;text-align:right;white-space:nowrap;font-size:12px;font-family:Trebuchet MS,Verdana,sans-serif;color:#94a3b8">
-    {age}
+  <td style="padding:14px 16px 14px 0;{border}vertical-align:top;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:{text_color};line-height:1.5;{text_decoration}">
+    {text}
+    {meta_line}
   </td>
 </tr>"""
 
