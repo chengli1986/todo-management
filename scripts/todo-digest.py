@@ -464,7 +464,7 @@ def build_html(data: dict) -> str:
         <tr>
           <td style="padding:16px 28px;border-top:1px solid #d0d7de;text-align:center">
             <span style="font-size:11px;font-family:Trebuchet MS,Verdana,sans-serif;color:#656d76">
-              Delivered every 4 hours &middot; {done_total} done, {skipped_total} skipped all time
+              Daily digest &middot; {done_total} done, {skipped_total} skipped all time
             </span>
           </td>
         </tr>
